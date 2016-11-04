@@ -16,5 +16,4 @@ path_group = proj.factory.path_group(initial_state)
 
 find(path_group,cfg)
 print len(path_group.found)
-for obj in path_group.found[0].trace:
-    print obj
+print path_group.found[0].state.se.any_str(argv1)
