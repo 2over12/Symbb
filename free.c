@@ -10,8 +10,9 @@ int main(int argc, char *argv[])
 		return 0;
 	int *f=malloc(sizeof(int));
 	*f=4;
-	badfunc(f);
-	if(in==3)
+	if (in>=5)
+		badfunc(f);
+	if(in<=5)
 		printf("%d\n",*f);
 }
 
@@ -19,4 +20,3 @@ void badfunc(int *arn)
 {
 	free(arn);
 }
-

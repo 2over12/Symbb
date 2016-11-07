@@ -1,2 +1,2 @@
-break badfunc
+break *0x0804851f
 
