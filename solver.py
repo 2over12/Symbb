@@ -16,4 +16,7 @@ initial_state.add_constraints(argv1 <= '9')
 path_group = proj.factory.path_group(initial_state)
 
 find(path_group,cfg)
-use(path_group,ddg)
+print path_group.found[0].state.se.any_str(argv1)
+for item in path_group.found[0].trace:
+    print item
+use(path_group,ddg,cfg)
