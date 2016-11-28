@@ -1,6 +1,6 @@
 #for a given path group and explore it for frees and return a list of addresses of frees
 def find(path_group,cfg):
-    addrFree=funcAddr("plt.malloc",cfg)
+    addrFree=funcAddr("plt.free",cfg)
     #addrs=[]
     #while len(path_group.active)>0:
     #    path_group.step()
