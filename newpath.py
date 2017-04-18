@@ -4,15 +4,18 @@ import signal
 from triton  import *
 from pintool import *
 from triton.ast import *
+import os
+import random
+import json
 #./triton ~/Documents/Symbb/newpath.py ~/fuzzExpat/harness/otest ~/fuzzExpat/harness/note.xml
+f = []
 def taint(inst):
-	if inst.getAddress() == 0x00401762:
+	if inst.getAddress() == 0x00400c82:
 		print ' Symbolizing memory at %#x: %s' %(inst.getAddress(),inst.getDisassembly())
 		rsi=getCurrentRegisterValue(REG.RSI)
 		memval=getCurrentMemoryValue(rsi)
 		index=0
 		while memval != 0x00:
-			print chr(memval)
 			a=convertMemoryToSymbolicVariable(MemoryAccess(rsi+index,CPUSIZE.BYTE,memval))
 			#taintMemory(r12+index)
 	#
@@ -22,7 +25,10 @@ def taint(inst):
 			memval=getCurrentMemoryValue(rsi+index)
 
 		print str(index)+" bytes symblized"
-
+def finishing():
+	with open('bitmap.json','w') as fp:
+	    json.dump(afterIns.bitmap,fp,sort_keys=True, indent=4)
+	#print afterIns.bitmap
 def getMemoryString(addr):
     s = str()
     index = 0
@@ -35,20 +41,13 @@ def getMemoryString(addr):
 
     return s
 
-#def beforeIns(inst):
-#	if inst.isBranch:
-#		takeSnapshot();
 def afterIns(inst):
-	 if inst.isBranch():
-		# print "right here"
-		 #takeSnapshot()
-		 #print inst
-		 #print hex(inst.getNextAddress())
+	 if inst.isControlFlow() and inst.getType() not in [OPCODE.RET, OPCODE.JMP, OPCODE.CALL] and (0x0000000000400000 <= inst.getAddress() < 0x000000000062a000):
 		 currLoc=getConcreteRegisterValue(REG.RIP)
-		 if currLoc^afterIns.prevLoc in afterIns.bitmap:
- 			 afterIns.bitmap[currLoc^afterIns.prevLoc]=+1
+		 if unicode(currLoc^afterIns.prevLoc) in afterIns.bitmap:
+ 			 afterIns.bitmap[unicode(currLoc^afterIns.prevLoc)]=+1
  		 else:
- 			 afterIns.bitmap[currLoc^afterIns.prevLoc]=1;
+ 			 afterIns.bitmap[unicode(currLoc^afterIns.prevLoc)]=1;
 		 obj=inst.getFirstOperand()
 		 nLoc=0
 		# print type(obj)
@@ -59,13 +58,12 @@ def afterIns(inst):
 				 nLoc=obj.getValue()
 			 else:
 				 nLoc=obj.getConcreteValue()
-				 print inst
-				 print hex(nLoc)
 
 		 if currLoc==nLoc:
 			 nLoc=inst.getNextAddress()
-		 if nLoc^afterIns.prevLoc not in afterIns.bitmap:
-		 	pco=getPathConstraints()
+		 if unicode(nLoc^afterIns.prevLoc) not in afterIns.bitmap:
+			print str(nLoc^afterIns.prevLoc)
+			pco=getPathConstraints()
 		 	cstr=ast.equal(ast.bvtrue(),ast.bvtrue())
 		 	for pc in pco:
 			 	if pc.isMultipleBranches():
@@ -76,51 +74,59 @@ def afterIns(inst):
 					 	if isPreviousBranchConstraint or isBranchToTake:
 						 	cstr=ast.land(cstr,branch["constraint"])
 		 	cstr = ast.assert_(cstr)
-			print cstr
 			print "starting solve"
+			#print cstr
 			model = getModel(cstr)
-		 	print "finishing solve"
-		 	print model
+			print model
+			solved=str()
+			for item in model:
+				solved+=chr(model[item].getValue())
+
+			print solved
+			r=random.randint(1, 10000000000)
+			while str(r) in f:
+				r=random.randint(1, 10000000000)
+			f.append(str(r))
+			file = open("/home/ian/fuzzExpat/out/queue/"+str(r)+"tagged", 'w+')
+			file.write(solved)
+			file.close()
+			print inst
+			print hex(nLoc)
+			print "Loc"+str(nLoc^afterIns.prevLoc)
+			print "finishing solve"
 			#do test FIGURE OUT IF SATISFIED
-			afterIns.bitmap[nLoc^afterIns.prevLoc]=1
+			afterIns.bitmap[unicode(nLoc^afterIns.prevLoc)]=1
 		 else:
-				afterIns.bitmap[nLoc^afterIns.prevLoc]=+1
+			 	#print "OMFG:"+str(afterIns.bitmap[nLoc^afterIns.prevLoc])
+				afterIns.bitmap[unicode(nLoc^afterIns.prevLoc)]=afterIns.bitmap[unicode(nLoc^afterIns.prevLoc)]+1
+				#print "OH:"+str(afterIns.bitmap[nLoc^afterIns.prevLoc])
 		 afterIns.prevLoc=currLoc>>1
 
-
-
-		 #if currLoc==0x00401743:
-		 #	print hex(currLoc);
-		#	print hex(getConcreteRegisterValue(REG.RIP))
-		 #a=False
-		 #if currLoc^beforeIns.prevLoc in beforeIns.bitmap:
-			# beforeIns.bitmap[currLoc^beforeIns.prevLoc]+=1;
-			 #print "Bitmap:"+str(beforeIns.bitmap)
-		#	 a=True
-		# else:
-		#	beforeIns.bitmap[currLoc^beforeIns.prevLoc]=1;
-		 #for se in inst.getSymbolicExpressions():
-		#	if se.isSymbolized() and a:
-		#		print '%#x: %s %d' %(inst.getAddress(),inst.getDisassembly(),beforeIns.bitmap[currLoc^beforeIns.prevLoc])
-
-				#print '\t -> %s' %(se.getAst())#.isTainted()
-				#print '\t\t'+str(se.isSymbolized())+" "+str(getCurrentRegisterValue(REG.ZF))
-			#zfExpr=getFullAstFromId(getSymbolicRegisterId(REG.ZF))
-			#expr=assert_(equal(bvtrue(),zfExpr))
-			#print getModel(expr)
-		#		print
-		# beforeIns.prevLoc=currLoc>>1
-	#if instruction.isBranch:
-	#	print '%#x:%s' %(instruction.adress,instruction.assembly)
+# Constant folding simplification.
+def constantFolding(node):
+    if node.isSymbolized():
+        return node
+    return ast.bv(node.evaluate(), node.getBitvectorSize())
 
 if __name__=='__main__':
+	for(dirpath,dirnames,filenames) in os.walk("/home/ian/fuzzExpat/out/queue"):
+		f.extend(filenames)
+		break
 	setArchitecture(ARCH.X86_64)
-	startAnalysisFromSymbol('main')
+	#setupImageWhitelist(['libexpat.a'])
+	startAnalysisFromAddress(0x00400c82)
+    # Align the memory
+	enableMode(MODE.ALIGNED_MEMORY, True)
+    # Only perform the symbolic execution on the target binary
+	#setupImageWhitelist(['otest'])
 	insertCall(afterIns,INSERT_POINT.AFTER)
 	insertCall(taint,INSERT_POINT.BEFORE_SYMPROC)
+	insertCall(finishing,INSERT_POINT.FINI)
+	addCallback(constantFolding, CALLBACK.SYMBOLIC_SIMPLIFICATION)
 	afterIns.prevLoc=0
 	afterIns.bitmap=dict()
-	with open('bitmap.json') as f:
-	    afterIns.bitmap = json.load(f)
+	with open('bitmap.json','r') as fp:
+	     afterIns.bitmap = json.load(fp)
+	print afterIns.bitmap
 	runProgram()
 	#print str(beforeIns.bitmap)

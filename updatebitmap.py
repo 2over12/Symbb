@@ -9,6 +9,7 @@ import json
 
 
 def finished():
+    print afterIns.bitmap
     with open('bitmap.json', 'w') as f:
         json.dump(afterIns.bitmap, f)
 def afterIns(inst):
@@ -23,6 +24,7 @@ if __name__=='__main__':
     print cwd
     setArchitecture(ARCH.X86_64)
     startAnalysisFromSymbol('main')
+    enableMode(MODE.ALIGNED_MEMORY, True)
     insertCall(afterIns,INSERT_POINT.AFTER)
     insertCall(finished,INSERT_POINT.FINI)
     print "here"
